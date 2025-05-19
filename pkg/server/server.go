@@ -58,11 +58,14 @@ type hookRunner interface {
 }
 
 type Server struct {
-	ctx          context.Context
-	ctxCleanupWG *sync.WaitGroup
-	notifier     Notifier
-	observer     observer
-	hookRunner   hookRunner
+	ctx              context.Context
+	ctxCleanupWG     *sync.WaitGroup
+	notifier         Notifier
+	observer         observer
+	hookRunner       hookRunner
+	// Default allow/deny lists for event filtering
+	DefaultAllowList []*tetragon.Filter
+	DefaultDenyList  []*tetragon.Filter
 	tetragon.UnimplementedFineGuidanceSensorsServer
 }
 
@@ -70,13 +73,15 @@ type getEventsListener struct {
 	events chan *tetragon.GetEventsResponse
 }
 
-func NewServer(ctx context.Context, cleanupWg *sync.WaitGroup, notifier Notifier, observer observer, hookRunner hookRunner) *Server {
+func NewServer(ctx context.Context, cleanupWg *sync.WaitGroup, notifier Notifier, observer observer, hookRunner hookRunner, allowList, denyList []*tetragon.Filter) *Server {
 	return &Server{
-		ctx:          ctx,
-		ctxCleanupWG: cleanupWg,
-		notifier:     notifier,
-		observer:     observer,
-		hookRunner:   hookRunner,
+		ctx:              ctx,
+		ctxCleanupWG:     cleanupWg,
+		notifier:         notifier,
+		observer:         observer,
+		hookRunner:       hookRunner,
+		DefaultAllowList: allowList,
+		DefaultDenyList:  denyList,
 	}
 }
 
@@ -128,6 +133,15 @@ func (s *Server) GetEventsWG(request *tetragon.GetEventsRequest, server tetragon
 		"events.field_filters":       request.GetFieldFilters(),
 		"events.aggregation_options": request.GetAggregationOptions(),
 	}).Debug("Received a GetEvents request")
+
+	// Inject default allow/deny lists if not set by client
+	if len(request.AllowList) == 0 && len(s.DefaultAllowList) > 0 {
+		request.AllowList = s.DefaultAllowList
+	}
+	if len(request.DenyList) == 0 && len(s.DefaultDenyList) > 0 {
+		request.DenyList = s.DefaultDenyList
+	}
+
 	allowList, err := filters.BuildFilterList(s.ctx, request.AllowList, filters.Filters)
 	if err != nil {
 		if readyWG != nil {

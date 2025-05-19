@@ -34,12 +34,13 @@ func NewProcessManager(
 	wg *sync.WaitGroup,
 	manager *sensors.Manager,
 	hookRunner *rthooks.Runner,
+	allowList, denyList []*tetragon.Filter, // new params
 ) (*ProcessManager, error) {
 	pm := &ProcessManager{
 		listeners: make(map[server.Listener]struct{}),
 	}
 
-	pm.Server = server.NewServer(ctx, wg, pm, manager, hookRunner)
+	pm.Server = server.NewServer(ctx, wg, pm, manager, hookRunner, allowList, denyList)
 
 	// Exec cache is always needed to ensure events have an associated Process{}
 	eventcache.New(pm)

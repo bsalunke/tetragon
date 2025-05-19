@@ -468,11 +468,17 @@ func tetragonExecuteCtx(ctx context.Context, cancel context.CancelFunc, ready fu
 		os.Remove(observerDir)
 	}()
 
+	allowList, denyList, err := getExportFilters()
+	if err != nil {
+		return err
+	}
 	pm, err := tetragonGrpc.NewProcessManager(
 		ctx,
 		&cleanupWg,
 		observer.GetSensorManager(),
-		hookRunner)
+		hookRunner,
+		allowList, denyList, // pass filters to ProcessManager
+	)
 	if err != nil {
 		return err
 	}
